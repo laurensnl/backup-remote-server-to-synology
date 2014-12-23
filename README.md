@@ -15,18 +15,6 @@ dashboard -> Log center -> Log Search.
  
 A more detailed log called 'backup-log.txt' will be stored in the 'logs' directory.
 
-
-# Directory structure
-
-/volumeX/vpsbackups (or any other name)  
-  ↳ backups  
-  ↳ logs  
-  ↳ scripts  
-       ↳ linkdups  
-       ↳ vps_backup  
-       ↳ vps\_backup_exclude  
-       ↳ vps\_backup_prep  
-
 The script can also be used to backup a remote server to a non-Synology device.
 In that case, remove all references to Synology features (synolog and synodsmnotify)
 
