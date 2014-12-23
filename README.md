@@ -44,37 +44,39 @@ Extra script/data files used by this script...
   home_backup_prep     # prepare backup on backup server (make linked copy)
 
 
+# Linkdups
 
-# The actual backup method involves the way "rsync" updates files that change.
-# When that happens any hardlink that is attached to that file in the backup
-# directory is broken.  As such the older 'snapshot' of the file is preserved
-# while the "current" backup gets a new version of the file, (the whole file).
-#
-# This also means any files which are unmodified from the last "snapshot" to
-# the next remain hard linked together, so only one physical copy of each file
-# version is kept on disk, resulting in enormous disk space savings.  The disk
-# cost (not counting inodes) is the directory structure, and any files which
-# are either new or had been modified.
-#
-# A detail discussion and examples of this technique is provided on the web
-#  Easy Snapshot-Style Backups with Rsync
-#     http://www.mikerubel.org/computers/rsync_snapshots/
-#
-# There is one caveat with this system.  When a file is moved, renamed, or
-# worse a whole directory is renamed, rsync will also break the hardlink, even
-# though the file itself has not changed.  As such a secondary method of
-# 're-linking' moved or renamed files is needed. This is achieved using the
-# "linkdups" script, and performed by the "home_backup_roll" script after the
-# rsync is complete, and before it generates the various backup cycles from
-# the new "current" backup, just made.
-#
-# As a side effect any copies of the same file may also become hard linked
-# together in the backup.  To prevent lots of small (empty) but otherwise
-# unrelated files being re-linking together, the "linkdups" limits its task
-# to files larger than a few disk blocks.
-#
-# THE LINKDUPS SCRIPT IS DISABLED IN THIS VERSION OF THE SCRIPT
-# Performance was bad and questionable links were being made when enabled.
+The actual backup method involves the way "rsync" updates files that change.
+When that happens any hardlink that is attached to that file in the backup
+directory is broken.  As such the older 'snapshot' of the file is preserved
+while the "current" backup gets a new version of the file, (the whole file).
+
+This also means any files which are unmodified from the last "snapshot" to
+the next remain hard linked together, so only one physical copy of each file
+version is kept on disk, resulting in enormous disk space savings.  The disk
+cost (not counting inodes) is the directory structure, and any files which
+are either new or had been modified.
+
+A detail discussion and examples of this technique is provided on the web
+ Easy Snapshot-Style Backups with Rsync
+ http://www.mikerubel.org/computers/rsync_snapshots/
+
+There is one caveat with this system.  When a file is moved, renamed, or
+worse a whole directory is renamed, rsync will also break the hardlink, even
+though the file itself has not changed.  As such a secondary method of
+'re-linking' moved or renamed files is needed. This is achieved using the
+"linkdups" script, and performed by the "home_backup_roll" script after the
+rsync is complete, and before it generates the various backup cycles from
+the new "current" backup, just made.
+
+As a side effect any copies of the same file may also become hard linked
+together in the backup.  To prevent lots of small (empty) but otherwise
+unrelated files being re-linking together, the "linkdups" limits its task
+to files larger than a few disk blocks.
+
+THE LINKDUPS SCRIPT IS DISABLED IN THIS VERSION OF THE SCRIPT
+Performance was bad and questionable links were being made when enabled.
+Suggestions for a workaround are more than welcome!
 
 
 CREDITS
