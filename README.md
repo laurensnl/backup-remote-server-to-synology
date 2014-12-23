@@ -24,9 +24,8 @@ In that case, remove all references to Synology features (synolog and synodsmnot
    -u   update only, do not 'roll' backup into snapshot backup cycles  
    -r   roll snapshots only (as needed), do not update the primary backup  
 
-------------------
-
-Extra script/data files used by this script...
+## More info
+Extra script/data files used by this script  
   home_backup_exclude  exclude (and include) list of files (data caches)  
   home_backup_prep     prepare backup on backup server (make linked copy)
 
@@ -58,7 +57,7 @@ together in the backup.  To prevent lots of small (empty) but otherwise
 unrelated files being re-linking together, the "linkdups" limits its task
 to files larger than a few disk blocks.
 
-LINKDUPS IS DISABLED IN THIS VERSION OF THE SCRIPT
+LINKDUPS IS DISABLED IN THIS VERSION OF THE SCRIPT  
 Performance was bad and questionable links were being made.
 Suggestions for a suitable solution are more than welcome.
 
@@ -76,7 +75,7 @@ Edited by Laurens Maarschalkerweerd -- December 2014
 SSH connection with the server should be made without password using SSH
 public key authentication
 
-Install using IPKG:
+Install using IPKG:  
 - bc (terminal command /opt/bin/ipkg install bc)
 
 To install IPKG on a Synology DS414:
