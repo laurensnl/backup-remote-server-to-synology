@@ -17,7 +17,7 @@ In that case, remove all references to Synology features (synolog and synodsmnot
 
 
 # To perform a manual backup
-> > /volumeX/vpsbackups/scripts/vps_backup
+> \> /volumeX/vpsbackups/scripts/vps_backup
 
 
 # Options
