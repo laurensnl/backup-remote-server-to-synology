@@ -19,13 +19,20 @@ A more detailed log called 'backup-log.txt' will be stored in the 'logs' directo
 # Directory structure
 
 /volumeX/vpsbackups (or any other name)
+
  ↳ backups
+
  ↳ logs
+
  ↳ scripts
-    ↳ linkdups
-    ↳ vps_backup
-    ↳ vps_backup_exclude
-    ↳ vps_backup_prep
+
+   ↳ linkdups
+
+   ↳ vps_backup
+
+   ↳ vps_backup_exclude
+
+   ↳ vps_backup_prep
 
 The script can also be used to backup a remote server to a non-Synology device.
 In that case, remove all references to Synology features (synolog and synodsmnotify)
@@ -33,7 +40,7 @@ In that case, remove all references to Synology features (synolog and synodsmnot
 
 # To perform a manual backup
 
-> > /volumeX/vpsbackups/scripts/vps_backup
+    > /volumeX/vpsbackups/scripts/vps_backup
 
 
 # Options
