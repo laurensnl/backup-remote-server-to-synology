@@ -16,16 +16,18 @@ The script can also be used to backup a remote server to a non-Synology device.
 In that case, remove all references to Synology features (synolog and synodsmnotify)
 
 
-# To perform a manual backup
+## To perform a manual backup
 > \> /volumeX/vpsbackups/scripts/vps_backup
 
 
-# Options
-   -u   update only, do not 'roll' backup into snapshot backup cycles
-   -r   roll snapshots only (as needed), do not update the primary backup
+## Options
+   -u   update only, do not 'roll' backup into snapshot backup cycles  
+   -r   roll snapshots only (as needed), do not update the primary backup  
+
+------------------
 
 Extra script/data files used by this script...
-  home_backup_exclude  exclude (and include) list of files (data caches)
+  home_backup_exclude  exclude (and include) list of files (data caches)  
   home_backup_prep     prepare backup on backup server (make linked copy)
 
 The actual backup method involves the way "rsync" updates files that change.
@@ -39,9 +41,9 @@ version is kept on disk, resulting in enormous disk space savings.  The disk
 cost (not counting inodes) is the directory structure, and any files which
 are either new or had been modified.
 
-A detail discussion and examples of this technique is provided on the web
- Easy Snapshot-Style Backups with Rsync
-    http://www.mikerubel.org/computers/rsync_snapshots/
+A detail discussion and examples of this technique is provided on the web  
+	Easy Snapshot-Style Backups with Rsync  
+	http://www.mikerubel.org/computers/rsync_snapshots/
 
 There is one caveat with this system.  When a file is moved, renamed, or
 worse a whole directory is renamed, rsync will also break the hardlink, even
@@ -60,7 +62,7 @@ LINKDUPS IS DISABLED IN THIS VERSION OF THE SCRIPT
 Performance was bad and questionable links were being made.
 Suggestions for a suitable solution are more than welcome.
 
-# Credits
+## Credits
 
 Anthony Thyssen -- February 2004  
 	Original script called home_backup
@@ -69,7 +71,7 @@ Edited by Laurens Maarschalkerweerd -- December 2014
 	Modified to backup a remote server to a Synology NAS
 
 
-# Pre-requirements and dependancies 
+## Pre-requirements and dependancies 
 
 SSH connection with the server should be made without password using SSH
 public key authentication
