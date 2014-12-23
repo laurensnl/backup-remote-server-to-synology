@@ -1,4 +1,4 @@
-remote-server-to-synology-backup
+Backup a remote server to your Synology NAS
 ================================
 
 A push backup scheme that creates snapshot "rsync" backup of your remote
@@ -16,7 +16,7 @@ dashboard -> Log center -> Log Search.
 A more detailed log called 'backup-log.txt' will be stored in the 'logs' directory.
 
 
-# DIRECTORY STRUCTURE
+# Directory structure
 
 /volumeX/vpsbackups (or any other name)
  ↳ backups
@@ -31,11 +31,12 @@ The script can also be used to backup a remote server to a non-Synology device.
 In that case, remove all references to Synology features (synolog and synodsmnotify)
 
 
-TO PERFORM A MANUAL BACKUP
+# To perform a manual backup
 
 > /volumeX/vpsbackups/scripts/vps_backup
 
-# OPTIONS
+
+# Options
    -u   update only, do not 'roll' backup into snapshot backup cycles
    -r   roll snapshots only (as needed), do not update the primary backup
 
@@ -44,7 +45,7 @@ Extra script/data files used by this script...
   home_backup_prep     # prepare backup on backup server (make linked copy)
 
 
-# LINKDUPS
+# Linkdups
 
 The actual backup method involves the way "rsync" updates files that change.
 When that happens any hardlink that is attached to that file in the backup
@@ -79,16 +80,16 @@ Performance was bad and questionable links were being made when enabled.
 Suggestions for a workaround are more than welcome!
 
 
-# CREDITS
+# Credits
 
 Anthony Thyssen -- February 2004 
-Original script called home_backup
+ Original script called home_backup
 
 Edited by Laurens Maarschalkerweerd -- December 2014
-Modified to backup a remote server to a Synology NAS
+ Modified to backup a remote server to a Synology NAS
 
 
-# PRE-REQUIREMENTS AND DEPENDANCIES
+# Pre-requirements and dependancies
 
 SSH connection with the server should be made without password using SSH
 public key authentication
