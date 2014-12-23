@@ -33,7 +33,7 @@ In that case, remove all references to Synology features (synolog and synodsmnot
 
 # To perform a manual backup
 
-> /volumeX/vpsbackups/scripts/vps_backup
+> > /volumeX/vpsbackups/scripts/vps_backup
 
 
 # Options
@@ -82,7 +82,7 @@ Suggestions for a workaround are more than welcome!
 
 # Credits
 
-Anthony Thyssen -- February 2004 
+Anthony Thyssen -- February 2004
  Original script called home_backup
 
 Edited by Laurens Maarschalkerweerd -- December 2014
