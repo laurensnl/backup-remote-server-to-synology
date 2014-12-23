@@ -1,0 +1,67 @@
+#
+# home_backup_exclude
+#
+# Files to exclude in incremental backups
+#
+
+# Backup report files
+/BACKUP_INFO
+/BACKUP_LIST
+
+# Caches
+cache/
+.cache
+
+# SSH keys
+.ssh/id
+
+# Linux folders
+/proc/
+/boot/
+/sys/
+/dev/
+/lost+found/
+/media/
+/misc/
+/mnt/
+/net/
+/run/
+/var/run/
+/root/
+
+# Postfix
+/var/spool/postfix/maildrop/
+
+# Temporary files
+/tmp/
+/var/tmp/
+*.tmp
+@tmp
+
+# Log files
+/var/log/
+*.log
+
+# Webmin files
+/var/webmin/
+/etc/webmin/
+
+# Wordpress files
+/uploads/wpcf7_captcha/
+.sfs_debug_output.txt
+
+# SQL Databases (a script on the server makes daily database backups in /var/backups/database anyway)
+/var/lib/mysql/
+
+
+# EXAMPLES
+
+# /dir/ means exclude the root folder /dir
+# /dir/* means get the root folder /dir but not the contents
+# dir/ means exclude any folder anywhere where the name contains dir/
+# Examples excluded: /dir/, /usr/share/mydir/, /var/spool/dir/
+
+# /dir means exclude any folder anywhere where the name contains /dir
+# Examples excluded: /dir/, /usr/share/directory/, /var/spool/dir/
+
+# /var/spool/lpd/cf means skip files that start with cf within any folder within /var/spool/lpd
