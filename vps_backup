@@ -20,6 +20,7 @@
 # 
 # A more detailed log called 'backup-log.txt' will be stored in the 'logs' directory.
 #
+#
 # DIRECTORY STRUCTURE
 #
 # /volumeX/vpsbackups (or any other name)
