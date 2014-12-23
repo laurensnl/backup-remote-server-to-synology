@@ -19,19 +19,12 @@ A more detailed log called 'backup-log.txt' will be stored in the 'logs' directo
 # Directory structure
 
 /volumeX/vpsbackups (or any other name)
-
  ↳ backups
-
  ↳ logs
-
  ↳ scripts
-
    ↳ linkdups
-
    ↳ vps_backup
-
    ↳ vps_backup_exclude
-
    ↳ vps_backup_prep
 
 The script can also be used to backup a remote server to a non-Synology device.
