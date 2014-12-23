@@ -1,0 +1,489 @@
+#!/usr/bin/perl
+=head1 NAME
+
+linkdups    Report and Hard Link files which are duplicates
+
+=head1 SYNOPSIS
+
+  linkdups [options] -|files|dirs...
+  Options:
+     -n        Dry Run - do not actually do anything just report
+     -t        limit hardlinking between different top level directories
+     -s        limit hardlinking to the same top level directory
+     -p        Use the more public of the file permissions
+     -P        report progress though a large list of files (default)
+     -R        report files being linked (default)
+     -q        be quiet, don't report linking and progress (unless set again)
+     -l size   Limit the re-linking to files larger than this value. (Def 10K)
+     --help    Short usage summery
+     --doc     Full manual of command
+
+=head1 EXAMPLES
+
+   linkdups  other_dir/  file1 file2 file3
+   linkdups  data_store/
+   linkdups  -qRt  current_backup/ previous_backup/
+   find www -name '*.jpg' | linkdups -
+
+=head1 DESCRIPTION
+
+Given a list of files (read from STDIN using "-" option, or directly on
+command line), or just a list of directories to recurse through, find
+files which are duplicates of each other, and hard link them together,
+to save disk space.
+
+The duplicate files must have a resonable size (set by "-l" option) and
+must not be special system files or symbolic links.  The files size,
+then its full contents are compared, to ensure that they are truely
+duplicates.
+
+This program not only handles the re-linking of single files, but also
+goes to great lengths to re-link files that already belong to a group of
+hard linked files. That is it will attempt to
+
+  * Merge smaller hardlink groups into larger ones. That way disk space
+    may be finally freed when the last file of the smaller hardlink
+    group is re-linked to the larger.
+
+  * File merging permissions taking that of the newer file, unless the
+    -p option is used in whcih case permissions are merged and thus more
+    public for web server use.
+
+  * And transfer the newer time stamp (for correct source compiling)
+
+Few other hardlinking programs seem to perform these specific steps
+making simple assumptions, or just ignoring these details.
+
+
+Typical uses include...
+
+  * Find and save disk space in directories, for example in very large
+    data archives, such as the Linux Package Repositories (yum).
+
+  * Make it easy to create alternate directory index structures for
+    data.  Just copy and name the files as appropriate into the new
+    structure and then re-link the files to hardlink them back together,
+    recovering the disk space. In this way only the directory structure
+    is needed to be stored on disk. The files themselves use the same
+    amount of space.
+
+    This indexing technique is especialy useful for web based image
+    hierarchies, allowing an image to be placed in multiple directories
+    based referencing images by things like: subject, date, people in
+    photo, etc...
+
+  * Re-link incremental rsync backup archives.  The problem with these
+    archives is if a file or directory is renamed, but not actually
+    modified, the hardlinks between the backups become broken.  This
+    program can be used (with or without the -t top-level option) to
+    re-link these renamed files and parent directories properly and thus
+    recover the disk space that was lost from the renaming.
+
+=head1 CAVATS
+
+This program should only be used for backup archives and for data files.
+
+It should not be used blindly on a working home directory or some
+improper behaviour may result.  For example if two files are linked,
+and one is then modified, both files will share that modification.
+
+Known situations in which this can be especially bad include...
+
+  * The handling of local backup files (such a ".bak" files)
+    where one copy needs to be preserved when another is edited.
+
+  * SVN ".svn/text-base" files containing a copys of original files,
+    downloaded from the source repository.  As such are another
+    type of backup and should be preserved and kept separate.
+
+  * Configuration files with multiple similar config files, but which
+    refer (by name) to different thinsg, or may be modified later
+    as a seperate configurations.
+
+There is also a security concern, as a hard linked file will share the
+same permissions and ownership details.
+
+As such you should not link...
+
+  * Files owned by two different people, or with different groups.
+
+  * Files that are seperate copies to provide different access permissions.
+
+This typicaly does not include, files where one is publically available (such
+as via the WWW), but the other isn't.  In this case the more permissive
+permissions should be preversed.
+
+Because of these problems users should only use this between known sets that
+may contain duplicate 'data' files, such and photos. It should not be
+performed automatically, without fore-thought. And should not be performed
+globally over large sets of files with different uses, such as a users home
+directory.
+
+That is not to say it can not be used on rsync snapshot backups of such files,
+where you can unlink the files on restoration. just not on the original
+working copies if a diverse set of files.
+
+Finally if files are found to be on different file systems, then re-linking is
+not posible and the program will abort when this is discovered.
+
+=head1 SEEALSO
+
+ unlinkdups  Separate hardlinked files from each other over a directory.
+             Basically reverses what 'linkdups' did, especially when
+             done by mistake (such as in a SVN archive).
+
+             It will not however restore any separate permssions.
+
+ freedup     Similar program with other options.
+             See http://en.wikipedia.org/wiki/Freedup for a list of
+             many other similar programs.
+
+ md5_linkdups   An alturnative version using on md5sum file lists.
+             However the generation of the md5 checksum is on the same order
+             as the complete byte-by-byte verification.  As such using md5sums
+             just for this purpose is not really useful. It is only useful if
+             such checksums are being kept for other verification purposes,
+             for if performing many such file comparisions on data that is
+             commonly the same size.
+
+ md5_list   generate md5 checksum lists (slow as it read all the data)
+ md5_dups   find duplicate files based solely on thier md5sum
+ md5_cmp    find duplicate files based solely on thier md5sum
+
+=head1 AUTHOR
+
+  Anthony Thyssen  27 May 2008  <anthony@griffith.edu.au>
+
+=cut
+use strict;
+use File::Find;
+
+sub Usage {
+  use Pod::Usage;
+  pod2usage(@_);
+  exit 10;
+}
+
+my $limit = 10240;  # only files at least 10 Kbytes in size
+my $public = 0;     # merge permissions to more public (def: newer file)
+my $topdiff = 0;    # only link between different top level directories.
+my $topsame = 0;    # only link between the same top level directories.
+my $PROGRESS = 1;   # report you progress though directory tree
+my $REPORT = 1;     # report files as they are linked
+my $DRYRUN = 0;     # dry run, just report duplicates don't actually link them
+
+ARGUMENT:  # Multi-switch option handling
+while( @ARGV && $ARGV[0] =~ s/^-(?=.)// ) {
+  $_ = shift; {
+    m/^$/  && do { next };     # next argument
+    m/^-$/ && do { last };     # End of options
+    m/^\?/ && do { Usage };    # Usage Help
+    m/^-help$/   && &Usage( -verbose => 1);   # quick help (synopsis)
+    m/^-doc$/    && &Usage( -verbose => 2);   # output the entire manual
+    m/^-manual$/ && &Usage( -verbose => 2);   # output the entire manual
+
+    s/^n// && do { $DRYRUN++;       redo };   # dryrun - report only
+    s/^p// && do { $public=1;       redo };   # make perms more public
+    s/^t// && do { $topdiff=1;      redo };   # only link different topdirs
+    s/^s// && do { $topsame=1;      redo };   # only link same topdirs
+    s/^P// && do { $PROGRESS=1;     redo };   # report progress
+    s/^R// && do { $REPORT=1;       redo };   # report files being linked
+    s/^q// && do { $PROGRESS=$REPORT=0; redo };  # be quiet (progress & report)
+    s/^l// && do { $limit = $_ || shift; next }; # file size limit
+
+    Usage( "Unknown Option \"-$_\"\n" );
+  } continue { next ARGUMENT }; last ARGUMENT;
+}
+
+Usage("Options -s and -t can not be used together\n") if $topsame && $topdiff;
+
+my ($file, $file_prev, @stat, @stat_prev);
+my %files;                 # files of same size,
+my %group;                 # hardlink groups by inode
+my $saved_diskspace = 0;  # running count of free diskspace (data)
+
+# Progress report variables (WARNING: external program)
+my $B = '';
+if ( -t ) {
+  $B = `tput el`;       # terminfo: clear to end of line
+  # $B = `tput ed`;     # terminfo: clear to end of display
+  # $B = `tput dl 1`;   # terminfo:  delete line
+  # $B = (" "x(`tput cols`||80) . "\r";  # blank spaces -- fallback
+  # $B = (" "x80) . "\r";
+}
+#print "-"x100, "\r", $B, "x\n"; exit;   # DEBUG
+
+# Auto flush STDOUT and STDERR  (making IO Hot)
+select(( select(STDOUT), $| = 1 )[0]);
+select(( select(STDERR), $| = 1 )[0]);
+
+open(SAVE, ">&STDOUT");   # Save a copy of STDOUT
+open(NULL, ">/dev/null"); # open the bit bucket
+
+
+# Some statistics - average length of key lists
+my $key_count = 0;
+my $key_count_files = 0;
+my $key_count_max = 1;
+
+# ----------------------------------------------------------------------------
+# Main Program
+
+#
+# Loop through input arguments
+#
+my %find_opts = (
+    preprocess => \&process_dir,  # sort the directory being searched through
+    wanted     => \&process_file, # process each file found
+    no_chdir   => 1,              # do not change into each directory
+);
+
+@ARGV = ('.') unless  @ARGV;
+#find(\%find_opts, @ARGV);   # direct and simple find
+for my $arg (@ARGV) {   # handle each argument
+  if ( $arg eq "-" ) {
+    while( $arg = <STDIN> ) {
+      chomp $arg;
+      find(\%find_opts, $arg);
+    }
+  } else {
+      find(\%find_opts, $arg);
+  }
+}
+
+print STDERR "$B" if $PROGRESS;
+print STDERR "\n\n" if $PROGRESS && ! $DRYRUN;
+printf "Total disk savings %d Kbytes.\n\n", $saved_diskspace
+  unless $DRYRUN;
+
+exit 0;
+
+# ---
+
+# progress report
+sub process_dir {
+  # Progress report of directory traversal
+  if ( $PROGRESS ) {
+    if ( 1 ) {
+      my $dir = substr($File::Find::dir,0,66);
+      $dir =~ s/^\.\///;
+      $dir =~ s/\/[^\/]*$/\//;
+      printf STDERR "$B Directory: %s\r", $dir;
+    }else{
+      # Debugging file length arrys
+      my $dir = substr($File::Find::dir,0,55);
+      $dir =~ s/^\.\///;
+      $dir =~ s/\/[^\/]*$/\//;
+      printf STDERR "$B KeyLen: %.1f (%d) Dir: %s\r",
+           $key_count_files/($key_count||1), $key_count_max, $dir;
+    }
+  }
+  return ( sort @_ );  # Sort filenames within each directory.
+}
+
+# process new file
+sub process_file {
+  $file = $_;    # the file being looked at.
+
+  # Check files exist
+  @stat = lstat( $file );
+  if ( ! -e _ ) { # file missing
+    print STDERR "Stat Failed for File \"$file\" : $!\n";
+    return;
+  }
+
+  return if -l _ || ! -f _;               # only files, not symlinks
+  return if -s _ < $limit;                # only deal with large files
+  return if $file =~ /\/\.svn\/|\.bak$/;  # ignore these files.
+
+
+  # Use the size of the file as a key to find posible duplicates
+  # Alturnatives include filesize and chksum of first 'block' of the file
+  # I do not recomend the use of a whole file chksum, unless pre-prepared.
+  my $key = -s _;
+
+  # Not in database?  Add just it as a one element array.
+  if ( ! defined $files{$key} ) {
+    $files{$key} = [ $file ];
+    $key_count++; $key_count_files++;
+    return;
+  }
+
+  # if file is already part of a hard link group, add it to that group.
+  if ( defined $group{$stat[1]} ) {
+    push( @{ $group{$stat[1]} }, $file );
+    return;
+  }
+
+  # A previous file of this key (size) has been seen.
+  # However multiple different files could have the same key (size).
+
+  # Go through all the previously seen files of this size
+  # Each file in list will represent a different but unique hardlink group.
+
+  for ( my $i = 0; $i <= $#{$files{$key}}; $i++ ) {
+
+    next if $topdiff && same_top($file_prev,$file);   # top must be different
+    next if $topsame && !same_top($file_prev,$file);  # top must be same
+
+    $file_prev = $files{$key}[$i];
+    @stat_prev = lstat( $file_prev );
+    if ( ! -e _ || -l _ || ! -f _ ) {
+      print STDERR "Previous processed file changed - clean and continue\n",
+            "\t\"$file_prev\" : $!\n";
+      $key_count_files--;
+      splice( @{$files{$key}}, $i, 1 ); # remove file from array
+      redo if $i <= $#{$files{$key}};   # try next file (no increment)
+      last;                             # no more files, exit loop, no match
+    }
+
+    # Check the files.
+    if ( $stat[0] != $stat_prev[0] ) {
+      print STDERR "Given files are on different file systems - ABORTING\n";
+      print STDERR "\t$file_prev\n";
+      print STDERR "\t$file\n";
+      exit 10;
+    }
+
+    # while a key is usally a files size, it may not always be the case
+    next if $stat[7] != $stat_prev[7];  # different file sizes - no match
+
+    # If same inode, then it is part of a known hardlink group - add it
+    if ( $stat[1] == $stat_prev[1] ) {
+      $group{$stat[1]} = [ $file_prev ]  unless defined $group{$stat[1]};
+      push( @{$group{$stat[1]}}, $file );  # add to this hardlinked group
+      return;        # no more action needed next input file
+    }
+
+    # Is this file really a duplicate - compare actual file data
+    open(STDOUT, ">&NULL");   # redirect stdout to /dev/null
+    my $cmp = system( 'cmp', $file_prev, $file );
+    open(STDOUT, ">&SAVE");   # restore it as normal
+    next if $cmp;   # these two files do not match, try next file in list
+
+    link_duplicates();
+
+    return;  # we have dealt with this file, process next input file.
+
+  } # look for a previous matching file
+
+  # This file is not a duplicate of any of the files in list!
+  push( @{$files{$key}}, $file );     # add file to end
+  $key_count_files++;
+  $key_count_max = @{$files{$key}} if $key_count_max < @{$files{$key}};
+
+  # loop to next file to process.
+}
+
+
+# ---------------------------------------
+# This is the core action of the program
+
+sub same_top {
+  my ($f1, $f2) = @_;
+  $f1 =~ s/^\.\.?\///;
+  $f2 =~ s/^\.\.?\///;
+  $f1 =~ s/^(\/?[^\/]+)\/.*$/$1/; # junk all but top part
+  $f2 =~ s/^(\/?[^\/]+)\/.*$/$1/;
+  return $f1 eq $f2;
+}
+
+sub link_duplicates {
+  # We have found a duplicate!  Link them together
+  # Global variables are used as arguments
+
+  my $inode_prev = $stat_prev[1];
+  my $inode = $stat[1];
+
+  # To simplify the merger, make sure the hardlink group exists
+  $group{$inode_prev} = [ $file_prev ] unless defined $group{$inode_prev};
+
+  print STDERR "$B" if $PROGRESS;
+
+  # If the number of actual hardlinks of previous file
+  #   is larger than the new file, than new file merges into that group
+  if ( $stat_prev[3] >= $stat[3] ) {
+
+    if ( $REPORT ) {
+      printf "Link duplicates (second linked to first)\n";
+      printf "%8d %2d %s\n", $stat_prev[7], $stat_prev[3], $file_prev;
+      printf "%8d %2d %s\n", $stat[7], $stat[3], $file;
+    }
+
+    if ( ! $DRYRUN ) {
+      unlink($file)   or die("Unable to delete file, for re-link: $!");
+      link($file_prev, $file)
+                      or die("failed to re-link file after deletion: $!");
+      # append new file into previous hardlink group list
+      push( @{$group{$inode_prev}}, $file );
+
+      if ( $stat[3] == 1 ) {
+        # This hard link has now saved some disk space!
+        my $diskspace = $stat[12] / 2;  # convert 512B blocks to Kbytes
+        printf "Saved %d Kbytes of diskspace saved by hard linking file.\n",
+            $diskspace  if $REPORT;
+        $saved_diskspace += $diskspace;
+      } else {
+        printf "No diskspace saved, %d hardlinks to find .\n", $stat[3]-1
+              if $REPORT;
+      }
+    }
+
+  } else {
+
+    if ( $REPORT ) {
+      printf "Link duplicates (first linked to second)\n";
+      printf "%8d %2d %s\n", $stat_prev[7], $stat_prev[3], $file_prev;
+      printf "%8d %2d %s\n", $stat[7], $stat[3], $file;
+    }
+
+    if ( ! $DRYRUN ) {
+      # The file found may be part of large group of hardlinked files, we have
+      # already seen, as such we need to link each file previously seen to the
+      # second new file group of hardlinks, and and rename the hardlink group
+      for my $prev ( @{$group{$inode_prev}} ) {
+        unlink($prev)      or die("Unable to delete file for re-link: $!");
+        link($file, $prev) or die("failed to re-link file after deletion: $!");
+      }
+
+      if ( $stat_prev[3] == @{$group{$inode_prev}} ) {
+        # This link duplication will save some disk space!
+        my $diskspace = $stat[12] / 2;  # convert 512B blocks to Kbytes
+        printf "Saved %d Kbytes of diskspace saved by re-linking files.\n",
+            $diskspace     if $REPORT;
+        $saved_diskspace += $diskspace;
+      } else {
+        printf "No diskspace saved. %d hardlinks left to find.\n",
+          $stat_prev[3] - @{$group{$inode_prev}}    if $REPORT;
+      }
+
+      # Cleanup hardlink groups.   Change inode, and append new file
+      $group{$inode} = $group{$inode_prev};
+      push( @{$group{$inode}}, $file );
+      delete $group{$inode_prev};   # this inode is no longer a known group
+    }
+
+  } # which file has more hardlinks
+
+  printf "Total disk savings %d Kbytes.\n\n", $saved_diskspace
+     if ! $DRYRUN && $REPORT;
+
+  # Fix Permissions
+  my $perms;
+  if ( $public ) {
+    $perms = $stat_prev[2] | $stat[2];   # make more public (bit-OR merge)
+  } else {
+    $perms = $stat_prev[9] > $stat[9] ?
+             $stat_prev[2] : $stat[2];   # take the newer permissions
+  }
+  chmod($perms, $file_prev);             # re-set the permissions
+
+  # Fix the access/modification times
+  my $mtime = $stat_prev[9] > $stat[9] ?
+              $stat_prev[9] : $stat[9];  # the newer modification time
+  my $atime = $stat_prev[8] > $stat[8] ?
+              $stat_prev[8] : $stat[8];  # the newer access time
+  utime($atime, $mtime, $file_prev);     # re-set the file times
+}
+
+

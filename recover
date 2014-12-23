@@ -1,0 +1,121 @@
+#!/bin/ash
+#
+# recover [-c|-mwdh #|ls] [--] [file/directory]
+#
+# Recover files from the primary home backup directory.
+# Hardcode the normal location of your backup directory below.
+#
+# Options:
+#    -ls   list snapshots available, or the given directory in given snapshot
+#    -c    from the very last "current" backup made.
+#    -h#   from the last # hourly snapshop (if present)
+#    -d#   from the last # dayly snapshot (default: -d 1)
+#    -w#   from the last weekly # snapshot
+#    -m#   from the last monthly # snapshot
+#    -n    dry run -- see what will be recovered
+#
+###
+#
+#  Anthony Thyssen      5 November 2010
+#
+PROGNAME=`type $0 | awk '{print $3}'`  # search for executable on path
+PROGDIR=`dirname $PROGNAME`            # extract directory of program
+PROGNAME=`basename $PROGNAME`          # base name of program
+Usage() {                              # output the script comments as docs
+  echo >&2 "$PROGNAME:" "$@"
+  sed >&2 -n '/^###/q; /^#/!q; s/^#//; s/^ //; 3s/^/Usage: /; 2,$ p' \
+          "$PROGDIR/$PROGNAME"
+  exit 10;
+}
+
+# Location of your primary home backup directory
+acct=""
+dir=/volume3/VPS/backups/
+
+#DEBUG=true
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -ls) LIST=true ;;
+    -n)  flags='-n' ;;
+
+    -m*) n=`expr + "$1" : '-.\(..*\)'` || { shift; n="$1"; }
+         snap=`printf "mnth_%d_*"  "$n"`
+         ;;
+    -w*) n=`expr + "$1" : '-.\(..*\)'` || { shift; n="$1"; }
+         snap=`printf "week_%d_*"  "$n"`
+         ;;
+    -d*) n=`expr + "$1" : '-.\(..*\)'` || { shift; n="$1"; }
+         snap=`printf "day_%02d_*" "$n"`
+         ;;
+    -h*) n=`expr + "$1" : '-.\(..*\)'` || { shift; n="$1"; }
+         snap=`printf "hour_%d_*"  "$n"`
+         ;;
+    -c)  snap="current" ;;
+
+    --)  shift; break ;;     # forced end of options
+    -*)  Usage "Unknown Option \"$1\"" ;;
+    *)   break ;;            # unforced  end of user options
+
+  esac
+  shift
+done
+
+[ $# -ge 2 ] && Usage "Too many arguments"
+
+# Select ssh: 'r' is a special personal ssh which does personal
+# # account and host alias expansion, with appropriate DNS lookup
+# # regardless of the system configuration.
+case "`type 'r' 2>&1`" in
+  *'not found'*)   ssh=ssh ;;
+  * )              ssh='r' ;;
+esac
+ssh_opts='-x'  # no X window link
+
+
+cpdir () { 
+  [ "$DEBUG" ] && set -x
+  rsync -aSv -e "$ssh $ssh_opts" "$@"
+}
+rpwd () { 
+  realpath "${1:-`pwd`}" | sed "s#^`realpath $HOME`#.#; s#^./##;"
+}
+
+# List requested
+if [ "$LIST" ]; then
+  if [ $# -gt 0 ]; then
+    [ -z "$snap" ] && snap="day_01_*"   # default is this mornings backup
+    if [ -d "$1" ]; then
+      # List (columned) the given directory
+      cd $dir;  echo _____ '"$snap"' _____
+      cd $dir/'"$snap"'/"'`rpwd`'"; ls -FCa '"$1"';
+    else
+      # List (long) the specified file(s)
+      cd $dir/'"$snap"'/"'`rpwd`'"; ls -Flad '"$1"';
+    fi
+    exit 0
+  fi
+  if [ "$snap" ]; then
+    # List (columned) current directory in given snapshot
+    cd $dir;  echo _____ '"$snap"' _____
+    ls -FC '"$dir"'/'"$snap"'/"'`rpwd`'"
+    exit 0
+  fi
+  # List the shapshots available
+  cd $dir; ls -Cd *_[0-9]*
+  exit 0
+fi
+
+# No 'ls' option - do file recovery
+if [ $# -gt 0 ]; then
+  # do the actual recovery of files  (currently fails for '.' )
+  [ -z "$snap" ] && snap="day_01_*"   # default is this mornings backup
+  cpdir $flags $acct:"$dir/$snap/'`rpwd "$1"`'" "`dirname "$1"`"
+  exit 0
+elif [ "$snap" ]; then
+  'cd '"$dir"';  echo __=__ '"$snap"' __=__'
+  'ls -FC '"$dir"'/'"$snap"'/"'`rpwd`'"'
+else
+  'cd '"$dir"'; ls -Cd *_[0-9]*'
+fi
+
